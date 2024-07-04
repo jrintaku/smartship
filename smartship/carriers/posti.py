@@ -10,6 +10,8 @@ from ..objects import (
     Service)
 from ..shipments import Shipment
 
+import base64
+
 CARRIER_CODE = "POSTI"
 CARRIER_DESCRIPTION = "Posti Oy, Paketit ja kuljetusyksiköt"
 
@@ -129,7 +131,8 @@ VALID_ADDITIONAL_SERVICES = {
     ],
 }
 
-LOCATION_SERVICE_API_ENDPOINT = "https://locationservice.posti.com/location"
+# Sandbox!
+LOCATION_SERVICE_API_ENDPOINT = "https://sbxgw.ecosystem.posti.fi"
 
 
 class MobileReceiver(Receiver):
@@ -254,6 +257,59 @@ def _infer_parcels_class(service_id):
     if service_id == "PO5041":
         return WeightedParcels
     return Parcels
+
+def get_token(username, password):
+
+    url = "{}/token?grant_type=client_credentials".format(LOCATION_SERVICE_API_ENDPOINT)
+    authstring = "{}:{}".format(username, password)
+    authheader = 'Basic {}'.format(base64.b64encode(authstring.encode('utf-8')).decode('utf-8'))
+    print(authheader)
+    response = requests.post(url, data={
+        },
+        headers={
+            "Authorization": authheader,
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        })
+
+    if response.status_code == 200:
+        ACCESS_TOKEN = response.json().get("access_token")
+        TOKEN_LIFETIME = response.json().get("expires_in")
+    else:
+        print("Failed to obtain the OAuth token:", response.status_code)
+        print(response)
+        return None
+
+    return ACCESS_TOKEN, TOKEN_LIFETIME
+
+def get_locations_v3(ACCESS_TOKEN, language="fi,sv", fields=None, streetAddress=None, postcode=None, locality=None,
+                     countryCode="FI", limit=20, filter=None):
+    url = "{}/location/v3/find-by-address?".format(LOCATION_SERVICE_API_ENDPOINT)
+
+    header = {
+        "Accept-Language":language,
+        "Authorization": "Bearer {}".format(ACCESS_TOKEN)
+    }
+
+    params = {
+        "fields": fields,
+        "streetAddress":streetAddress,
+        "postcode":postcode,
+        "locality":locality,
+        "countryCode":countryCode,
+        "limit":limit,
+        "filter":filter
+    }
+
+    for key, value in list(params.items()):
+        if value is None:
+            params.pop(key)
+    
+
+    response = requests.get(url, headers=header, params=params)
+    print(response.json())
+    
+    return Locations(response.json()["servicePoints"])
 
 
 def get_locations(

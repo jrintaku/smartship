@@ -644,6 +644,33 @@ LOCATION_OPENING_TIME_SCHEMA = {
     }
 }
 
+AVAILABILITY_SCHEMA = {
+        "type": "object",
+        "properties": {
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "openingHours": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dayOfWeek": {"type": "string"},
+                "closes": {"type": "string"},
+                "closed": {"type": "boolean"},
+                "opens": {"type": "string"},
+                "open24h": {"type": "boolean"}
+              },
+              "required": ["dayOfWeek", "closes", "closed", "opens", "open24h"]
+            }
+          }
+        },
+        "required": ["exceptions", "openingHours"]
+}
+
 LOCATION_SCHEMA = {
     "type": "object",
     "properties": {
@@ -675,7 +702,10 @@ LOCATION_SCHEMA = {
         "pupCode": {"type": ["string", "null"]},
         "routingServiceCode": {"type": ["string", "null"]},
         "postalOfficeType": {"type": ["string", "null"]},
-        "availability": {"type": ["string", "null"]},
+        "availability": {
+            "type": ["object"],
+            "items": AVAILABILITY_SCHEMA,
+        },
         "partnerType": {"type": ["string", "null"]},
         "category": {"type": ["string", "null"]},
         "emptyTime": {"type": ["string", "null"]},
