@@ -6,7 +6,7 @@ from copy import deepcopy
 import requests
 
 from ..objects import (
-    Agent, Locations, Parcels, PDFConfig, Receiver, Sender, SenderPartners,
+    Agent, Locations, Locations_v3, Parcels, PDFConfig, Receiver, Sender, SenderPartners,
     Service)
 from ..shipments import Shipment
 
@@ -131,8 +131,12 @@ VALID_ADDITIONAL_SERVICES = {
     ],
 }
 
+LOCATION_SERVICE_API_ENDPOINT = "https://locationservice.posti.com/location"
+
+# New Posti V3 Location api
+LOCATION_SERVICE_API_ENDPOINT_V3 = "https://apigw2.ecosystem.posti.fi/"
 # Sandbox!
-LOCATION_SERVICE_API_ENDPOINT = "https://sbxgw.ecosystem.posti.fi"
+LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX = "https://sbxgw.ecosystem.posti.fi"
 
 
 class MobileReceiver(Receiver):
@@ -282,9 +286,40 @@ def get_token(username, password):
 
     return ACCESS_TOKEN, TOKEN_LIFETIME
 
-def get_locations_v3(ACCESS_TOKEN, language="fi,sv", fields=None, streetAddress=None, postcode=None, locality=None,
-                     countryCode="FI", limit=20, filter=None):
-    url = "{}/location/v3/find-by-address?".format(LOCATION_SERVICE_API_ENDPOINT)
+# V3 API
+def get_location_by_pupcode_v3(ACCESS_TOKEN, language="fi,sv", fields=None, pupCode=None, sandbox=False):
+    if sandbox == True:
+        url = "{}/location/v3/?".format(LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX)
+    else:
+        url = "{}/location/v3/?".format(LOCATION_SERVICE_API_ENDPOINT_V3)
+
+    header = {
+        "Accept-Language":language,
+        "Authorization": "Bearer {}".format(ACCESS_TOKEN)
+    }
+
+    params = {
+        "fields": fields,
+        "pupCode":pupCode,
+    }
+
+    for key, value in list(params.items()):
+        if value is None:
+            params.pop(key)
+    
+
+    response = requests.get(url, headers=header, params=params)
+    print(response.json())
+    
+    return Locations_v3(response.json()["servicePoints"])
+
+
+def get_locations_by_address_v3(ACCESS_TOKEN, language="fi,sv", fields=None, streetAddress=None, postcode=None, locality=None,
+                     countryCode="FI", limit=20, filter=None, sandbox=False):
+    if sandbox == True:
+        url = "{}/location/v3/find-by-address?".format(LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX)
+    else:
+        url = "{}/location/v3/find-by-address?".format(LOCATION_SERVICE_API_ENDPOINT_V3)
 
     header = {
         "Accept-Language":language,
@@ -309,7 +344,7 @@ def get_locations_v3(ACCESS_TOKEN, language="fi,sv", fields=None, streetAddress=
     response = requests.get(url, headers=header, params=params)
     print(response.json())
     
-    return Locations(response.json()["servicePoints"])
+    return Locations_v3(response.json()["servicePoints"])
 
 
 def get_locations(

@@ -644,7 +644,7 @@ LOCATION_OPENING_TIME_SCHEMA = {
     }
 }
 
-AVAILABILITY_SCHEMA = {
+AVAILABILITY_SCHEMA_V3 = {
         "type": "object",
         "properties": {
           "exceptions": {
@@ -702,9 +702,49 @@ LOCATION_SCHEMA = {
         "pupCode": {"type": ["string", "null"]},
         "routingServiceCode": {"type": ["string", "null"]},
         "postalOfficeType": {"type": ["string", "null"]},
+        "availability": {"type": ["string", "null"]},
+        "partnerType": {"type": ["string", "null"]},
+        "category": {"type": ["string", "null"]},
+        "emptyTime": {"type": ["string", "null"]},
+        "letterClass": {"type": ["string", "null"]},
+        "capacity": {"type": ["string", "null"]},
+    },
+}
+
+LOCATION_SCHEMA_V3 = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "type": {"type": "string"},
+        "locationName": LOCATION_NAME_SCHEMA,
+        "publicName": LOCATION_NAME_SCHEMA,
+        "labelName": LOCATION_NAME_SCHEMA,
+        "additionalInfo": LOCATION_NAME_SCHEMA,
+        "postalCode": {"type": ["string", "null"]},
+        "postalCodeAreas": {"type": ["array", "null"]},
+        "address": LOCATION_ADDRESS_NAME_SCHEMA,
+        "countryCode": {"type": "string"},
+        "location": {
+            "type": "object",
+            "properties": {
+                "lat": {"type": "string"},
+                "lon": {"type": "string"},
+            },
+        },
+        "openingTimes": {
+            "type": ["array", "null"],
+            "items": LOCATION_OPENING_TIME_SCHEMA,
+        },
+        "wheelChairAccess": {"type": "boolean"},
+        "dropOfTimeParcel": {"type": ["string", "null"]},
+        "dropOfTimeLetters": {"type": ["string", "null"]},
+        "dropOfTimeExpress": {"type": ["string", "null"]},
+        "pupCode": {"type": ["string", "null"]},
+        "routingServiceCode": {"type": ["string", "null"]},
+        "postalOfficeType": {"type": ["string", "null"]},
         "availability": {
             "type": ["object"],
-            "items": AVAILABILITY_SCHEMA,
+            "items": AVAILABILITY_SCHEMA_V3,
         },
         "partnerType": {"type": ["string", "null"]},
         "category": {"type": ["string", "null"]},
@@ -719,3 +759,10 @@ LOCATIONS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "items": LOCATION_SCHEMA,
 }
+
+LOCATIONS_SCHEMA_V3 = {
+    "type": "array",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "items": LOCATION_SCHEMA_V3,
+}
+
