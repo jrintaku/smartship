@@ -274,16 +274,15 @@ def _infer_parcels_class(service_id):
 
 def get_token(username, password):
 
-    url = "{}/token?grant_type=client_credentials".format(LOCATION_SERVICE_API_ENDPOINT)
+    url = "{}/token?grant_type=client_credentials".format(LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX)
     authstring = "{}:{}".format(username, password)
     authheader = 'Basic {}'.format(base64.b64encode(authstring.encode('utf-8')).decode('utf-8'))
     print(authheader)
+    print(url)
     response = requests.post(url, data={
         },
         headers={
             "Authorization": authheader,
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
         })
 
     if response.status_code == 200:
