@@ -5,7 +5,7 @@ from jsonschema import validate
 
 from .schemas import (
     ADDRESS_SCHEMA, AGENTS_SCHEMA, CUSTOMS_DECLARATION_SCHEMA, EXTRAS_SCHEMA,
-    LOCATION_SCHEMA, LOCATIONS_SCHEMA, LOCATION_SCHEMA_V3, LOCATIONS_SCHEMA_V3, PARCELS_SCHEMA, PARTNER_SCHEMA,
+    PICKUPPOINTS_SCHEMA_2025_04, PARCELS_SCHEMA, PARTNER_SCHEMA,
     PDF_CONFIG_SCHEMA, SERVICE_SCHEMA)
 
 
@@ -106,17 +106,5 @@ class TaxPayer(JSONObject):
 class PDFConfig(JSONObject):
     schema = PDF_CONFIG_SCHEMA
 
-
-class Location(JSONObject):
-    schema = LOCATION_SCHEMA
-
-
-class Locations(JSONObject):
-    schema = LOCATIONS_SCHEMA
-
-class Location_v3(JSONObject):
-    schema = LOCATION_SCHEMA_V3
-
-
-class Locations_v3(JSONObject):
-    schema = LOCATIONS_SCHEMA_V3
+class PickupPoints_2025_04(JSONObject):
+    schema = PICKUPPOINTS_SCHEMA_2025_04

@@ -6,7 +6,7 @@ from copy import deepcopy
 import requests
 
 from ..objects import (
-    Agent, Locations, Locations_v3, Parcels, PDFConfig, Receiver, Sender, SenderPartners,
+    Agent, PickupPoints_2025_04, Parcels, PDFConfig, Receiver, Sender, SenderPartners,
     Service)
 from ..shipments import Shipment
 
@@ -141,12 +141,9 @@ VALID_ADDITIONAL_SERVICES = {
     'PO5007': ['COD', 'NOT', 'OPAY', 'REMIPOST'],
 }
 
-LOCATION_SERVICE_API_ENDPOINT = "https://locationservice.posti.com/location"
+POSTI_PICKUP_POINT_DEFAULT_API_VERSION = "2025-04"
 
-# New Posti V3 Location api
-LOCATION_SERVICE_API_ENDPOINT_V3 = "https://apigw2.ecosystem.posti.fi/"
-# Sandbox!
-LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX = "https://sbxgw.ecosystem.posti.fi"
+POSTI_PICKUP_POINT_API_AUTH = "https://gateway-auth.posti.fi/api/v1/token"
 
 
 class MobileReceiver(Receiver):
@@ -272,159 +269,109 @@ def _infer_parcels_class(service_id):
         return WeightedParcels
     return Parcels
 
-def get_token(username, password):
+def get_token(username, password, posti_api_version=POSTI_PICKUP_POINT_DEFAULT_API_VERSION):
 
-    url = "{}/token?grant_type=client_credentials".format(LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX)
-    authstring = "{}:{}".format(username, password)
-    authheader = 'Basic {}'.format(base64.b64encode(authstring.encode('utf-8')).decode('utf-8'))
-    print(authheader)
-    print(url)
-    response = requests.post(url, data={
+    url = POSTI_PICKUP_POINT_API_AUTH
+
+    response = requests.post(
+        url,
+        data={
+            "grant_type": "client_credentials",
+            "client_id": username,
+            "client_secret": password
         },
         headers={
-            "Authorization": authheader,
+            "Content-Type": "application/x-www-form-urlencoded"
         })
 
     if response.status_code == 200:
-        ACCESS_TOKEN = response.json().get("access_token")
-        TOKEN_LIFETIME = response.json().get("expires_in")
+        access_token = response.json().get("access_token")
+        token_lifetime = response.json().get("expires_in")
+        api_version_details = response.json().get('posti_fi', {}).get('targets', {}).get(posti_api_version, {})
+        if not api_version_details:
+            print("Requested PPP API version not compatible with authenticated response.")
+            return None
+        else:
+            ppp_api_url = api_version_details.get('url')
+
     else:
         print("Failed to obtain the OAuth token:", response.status_code)
         print(response)
         return None
 
-    return ACCESS_TOKEN, TOKEN_LIFETIME
+    return access_token, token_lifetime, ppp_api_url
 
-# V3 API
-def get_location_by_pupcode_v3(ACCESS_TOKEN, language="fi,sv", fields=None, pupCode=None, sandbox=False):
-    if sandbox == True:
-        url = "{}/location/v3/?".format(LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX)
-    else:
-        url = "{}/location/v3/?".format(LOCATION_SERVICE_API_ENDPOINT_V3)
+def get_location_by_pupcode_2025_04(access_token, ppp_api_url, 
+            language, pupCode, country):
+
+    url = "{}/pickuppoints/{}/{}".format(ppp_api_url, country, pupCode)
 
     header = {
         "Accept-Language":language,
-        "Authorization": "Bearer {}".format(ACCESS_TOKEN)
+        "Authorization": "Bearer {}".format(access_token)
     }
 
-    params = {
-        "fields": fields,
-        "pupCode":pupCode,
-    }
-
-    for key, value in list(params.items()):
-        if value is None:
-            params.pop(key)
-    
-
-    response = requests.get(url, headers=header, params=params)
+    response = requests.get(url, headers=header)
     print(response.json())
-    
-    return Locations_v3(response.json()["servicePoints"])
 
-
-def get_locations_by_address_v3(ACCESS_TOKEN, language="fi,sv", fields=None, streetAddress=None, postcode=None, locality=None,
-                     countryCode="FI", limit=20, filter=None, sandbox=False):
-    if sandbox == True:
-        url = "{}/location/v3/find-by-address?".format(LOCATION_SERVICE_API_ENDPOINT_V3_SANDBOX)
+    points = response.json().get("pickupPoints")
+    if points:
+        return PickupPoints_2025_04(points)
     else:
-        url = "{}/location/v3/find-by-address?".format(LOCATION_SERVICE_API_ENDPOINT_V3)
+        return None
+
+def get_location_by_pupcode(access_token, posti_api_version, ppp_api_url, 
+            language="fi", pupCode=None, country="FI"):
+    if posti_api_version == "2025-04":
+        return get_location_by_pupcode_2025_04(access_token, ppp_api_url, 
+            language, pupCode, country)
+
+def get_locations_by_address_2025_04(access_token, ppp_api_url,
+            language, country, city, postcode, street_address, limit, filters, box_only):
+   
+    url = "{}/pickuppoints".format(ppp_api_url)
 
     header = {
-        "Accept-Language":language,
-        "Authorization": "Bearer {}".format(ACCESS_TOKEN)
+        "Accept-Language": language,
+        "Authorization": "Bearer {}".format(access_token)
     }
 
     params = {
-        "fields": fields,
-        "streetAddress":streetAddress,
-        "postcode":postcode,
-        "locality":locality,
-        "countryCode":countryCode,
-        "limit":limit,
-        "filter":filter
+        "searchCriteria":{
+            "location": {
+                "countryCode": country,
+                "postcode": postcode,
+            },
+            "serviceFilters": filters
+        },
+        "limit": limit
     }
+    if street_address:
+        params["searchCriteria"]["location"]["street"] = street_address
 
-    for key, value in list(params.items()):
-        if value is None:
-            params.pop(key)
+    if city:
+        params["searchCriteria"]["location"]["city"] = city
     
-
-    response = requests.get(url, headers=header, params=params)
+    if box_only is not None:
+        params["searchCriteria"]["parcelLocker"] = box_only
+    
+    response = requests.post(url, headers=header, json=params)
+    print(response)
+    print(response.status_code)
     print(response.json())
-    
-    return Locations_v3(response.json()["servicePoints"])
 
+    points = response.json().get("pickupPoints")
+    if points:
+        return PickupPoints_2025_04(points)
+    else:
+        return None 
 
-def get_locations(
-        country_code=None, top=None,
-        types=None, lattitude=None, longitude=None, distance=None, bounding_box=None,
-        zipcode=None, location_zipcode=None, strict_zip_code=None, city=None, municipality=None,
-        pup_code=None, partner_type=None):
-    """
-    :param country_code: Limits results to given county. Default value is FI (Finland)
-    :type country_code: str
-    :param top: Amount of locations to return. API returns this amount of closest locations
-    :type top: int
-    :param types: supported location types are "POSTOFFICE", "LETTERBOX", "SMARTPOST", "PICKUPPOINT",
-        "BUSINESSSERVICE", "POBOX", "LOCKER"
-    :type types: list
-    :param lattitude: Latitude of center location that search is done for. Top or distance parameter is required.
-    :type lattitude: str
-    :param : Longitude of center location that search is done for. Top or distance parameter is required.
-    :type longitude: str
-    :param distance: Filter which allows user to limit distance of returned locations. Parameter is used together with
-        lattitude/longitude.
-    :type distance: str
-    :param bounding_box: Limits results to geographical bounding box.
-    :type bounding_box: list
-    :param zipcode: Filter results based on zipcode
-    :type zipcode: str
-    :param location_zipcode: Find the closest pickup points using zipcode
-    :type location_zipcode: str
-    :param strict_zip_code: This is used together with zip_code parameter. If this is set True only results that
-        exactly match to the location zipcode are shown. If strict_zip_code is False, postal code area list is used to
-        match location to queried zipcode. Default value is False.
-    :type strict_zip_code: bool
-    :param city: Filter results based on city. Matches to any language version of the city.
-    :type city: str
-    :param municipality: Filter results based on municipality. Matches to any language version of the municipality.
-    :type municipality: str
-    :param pup_code: Filter results based on PupCode
-    :type pup_code: str
-    :param partner_type: Filter results based on partner type. Allowed types: "POSTI", "AIBE", "BOXNET",
-        "TOPO_CENTRAS".
-    :type partner_type: str
-    """
-    params = {
-        "countryCode": country_code,
-        "top": top,
-        "types": types,
-        "lat": lattitude,
-        "lng": longitude,
-        "distance": distance,
-        "zipCode": zipcode,
-        "locationZipCode": location_zipcode,
-        "strictZipCode": "true" if strict_zip_code else None,
-        "city": city,
-        "municipality": municipality,
-        "pupCode": pup_code,
-        "partnerType": partner_type,
-    }
-
-    if bounding_box is not None:
-        params["topLeftLat"] = bounding_box[0]
-        params["topLeftLng"] = bounding_box[1]
-        params["bottomRightLat"] = bounding_box[2]
-        params["bottomRightLng"] = bounding_box[3]
-
-    for key, value in list(params.items()):
-        if value is None:
-            params.pop(key)
-
-    response = requests.get(LOCATION_SERVICE_API_ENDPOINT, params=params)
-    response.raise_for_status()
-    return Locations(response.json()["locations"])
+def get_locations_by_address(access_token, posti_api_version, ppp_api_url, 
+            language="fi", country="FI", city=None, postcode=None,
+            street_address=None, limit=20, filters=None, box_only=None):
+    if posti_api_version == "2025-04":
+        return get_locations_by_address_2025_04(access_token, ppp_api_url,
+            language, country, city, postcode, street_address, limit, filters, box_only)
 
 
 def get_additional_services(service_id):

@@ -603,166 +603,74 @@ RESPONSE_SCHEMA = {
     }
 }
 
-LOCATION_ADDRESS_SCHEMA = {
+
+PICKUPPOINT_SCHEMA_2025_04 = {
     "type": "object",
     "properties": {
-        "address": {"type": ["string", "null"]},
-        "municipality": {"type": ["string", "null"]},
-        "postalCode": {"type": ["string", "null"]},
-        "postalCodeName": {"type": ["string", "null"]},
-        "streetName": {"type": ["string", "null"]},
-        "streetNumber": {"type": ["string", "null"]},
-    }
+                    "id": {"type": "string"},
+                    "publicName": {"type": "string"},
+                    "careOf": {"type": "string"},
+                    "parcelLocker": {"type": "boolean"},
+                    "availability": {
+                        "type": "object",
+                        "properties": {
+                            "openingHours": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "closes": {"type": "string"},
+                                        "dayOfWeek": {"type": "string"},
+                                        "open24h": {"type": "boolean"},
+                                        "opens": {"type": "string"},
+                                        "closed": {"type": "boolean"},
+                                    }
+                                }
+                            },
+                            "exceptions": {"type": "array"}
+                        }
+                    },
+                    "location": {
+                        "type": "object",
+                        "properties": {
+                            "countryCode": {"type": "string"},
+                            "street": {"type": "string"},
+                            "postcode": {"type": "string"},
+                            "city": {"type": "string"},
+                            "municipality": {"type": "string"},
+                            "specificLocation": {"type": ["string", "null"]},
+                            "coordinates": {
+                                "type": ["object", "null"],
+                                "properties": {
+                                    "latitude": {"type": ["number", "null"]},
+                                    "longitude": {"type": ["number", "null"]}
+                                }
+                            }
+                        },
+                        "required": ["countryCode", "street", "postcode", "city",
+                        "municipality"]
+                    },
+                    "capabilities": {"type": "array"},
+                    "routingServiceCode": {"type": ["string", "null"]},
+                    "distanceInMeters": {"type": ["integer", "null"]},
+                    "extensions": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "estimate": {
+                                "type": ["object", "null"],
+                                "properties": {
+                                    "time": {"type": ["string", "null"]}
+                                },
+                            }
+                        }
+                    },
+                },
+                "required": ["id", "publicName", "careOf", "parcelLocker",
+                    "availability", "location", "capabilities"]
 }
 
-LOCATION_ADDRESS_NAME_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "en": LOCATION_ADDRESS_SCHEMA,
-        "fi": LOCATION_ADDRESS_SCHEMA,
-        "sv": LOCATION_ADDRESS_SCHEMA,
-    },
-}
-
-LOCATION_NAME_SCHEMA = {
-    "type": ["object", "null"],
-    "properties": {
-        "en": {"type": ["string", "null"]},
-        "fi": {"type": ["string", "null"]},
-        "sv": {"type": ["string", "null"]},
-    }
-}
-
-LOCATION_OPENING_TIME_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "timeFrom": {"type": "string"},
-        "timeFromWithPoint": {"type": "string"},
-        "timeTo": {"type": "string"},
-        "timeToWithPoint": {"type": "string"},
-        "weekday": {"type": "string"},
-    }
-}
-
-AVAILABILITY_SCHEMA_V3 = {
-        "type": "object",
-        "properties": {
-          "exceptions": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
-          },
-          "openingHours": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "dayOfWeek": {"type": "string"},
-                "closes": {"type": "string"},
-                "closed": {"type": "boolean"},
-                "opens": {"type": "string"},
-                "open24h": {"type": "boolean"}
-              },
-              "required": ["dayOfWeek", "closes", "closed", "opens", "open24h"]
-            }
-          }
-        },
-        "required": ["exceptions", "openingHours"]
-}
-
-LOCATION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "string"},
-        "type": {"type": "string"},
-        "locationName": LOCATION_NAME_SCHEMA,
-        "publicName": LOCATION_NAME_SCHEMA,
-        "labelName": LOCATION_NAME_SCHEMA,
-        "additionalInfo": LOCATION_NAME_SCHEMA,
-        "postalCode": {"type": ["string", "null"]},
-        "postalCodeAreas": {"type": ["array", "null"]},
-        "address": LOCATION_ADDRESS_NAME_SCHEMA,
-        "countryCode": {"type": "string"},
-        "location": {
-            "type": "object",
-            "properties": {
-                "lat": {"type": "string"},
-                "lon": {"type": "string"},
-            },
-        },
-        "openingTimes": {
-            "type": ["array", "null"],
-            "items": LOCATION_OPENING_TIME_SCHEMA,
-        },
-        "wheelChairAccess": {"type": "boolean"},
-        "dropOfTimeParcel": {"type": ["string", "null"]},
-        "dropOfTimeLetters": {"type": ["string", "null"]},
-        "dropOfTimeExpress": {"type": ["string", "null"]},
-        "pupCode": {"type": ["string", "null"]},
-        "routingServiceCode": {"type": ["string", "null"]},
-        "postalOfficeType": {"type": ["string", "null"]},
-        "availability": {"type": ["string", "null"]},
-        "partnerType": {"type": ["string", "null"]},
-        "category": {"type": ["string", "null"]},
-        "emptyTime": {"type": ["string", "null"]},
-        "letterClass": {"type": ["string", "null"]},
-        "capacity": {"type": ["string", "null"]},
-    },
-}
-
-LOCATION_SCHEMA_V3 = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "string"},
-        "type": {"type": "string"},
-        "locationName": LOCATION_NAME_SCHEMA,
-        "publicName": LOCATION_NAME_SCHEMA,
-        "labelName": LOCATION_NAME_SCHEMA,
-        "additionalInfo": LOCATION_NAME_SCHEMA,
-        "postalCode": {"type": ["string", "null"]},
-        "postalCodeAreas": {"type": ["array", "null"]},
-        "address": LOCATION_ADDRESS_NAME_SCHEMA,
-        "countryCode": {"type": "string"},
-        "location": {
-            "type": "object",
-            "properties": {
-                "lat": {"type": "string"},
-                "lon": {"type": "string"},
-            },
-        },
-        "openingTimes": {
-            "type": ["array", "null"],
-            "items": LOCATION_OPENING_TIME_SCHEMA,
-        },
-        "wheelChairAccess": {"type": "boolean"},
-        "dropOfTimeParcel": {"type": ["string", "null"]},
-        "dropOfTimeLetters": {"type": ["string", "null"]},
-        "dropOfTimeExpress": {"type": ["string", "null"]},
-        "pupCode": {"type": ["string", "null"]},
-        "routingServiceCode": {"type": ["string", "null"]},
-        "postalOfficeType": {"type": ["string", "null"]},
-        "availability": {
-            "type": ["object"],
-            "items": AVAILABILITY_SCHEMA_V3,
-        },
-        "partnerType": {"type": ["string", "null"]},
-        "category": {"type": ["string", "null"]},
-        "emptyTime": {"type": ["string", "null"]},
-        "letterClass": {"type": ["string", "null"]},
-        "capacity": {"type": ["string", "null"]},
-    },
-}
-
-LOCATIONS_SCHEMA = {
+PICKUPPOINTS_SCHEMA_2025_04 = {
     "type": "array",
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "items": LOCATION_SCHEMA,
+    "items": PICKUPPOINT_SCHEMA_2025_04,
 }
-
-LOCATIONS_SCHEMA_V3 = {
-    "type": "array",
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "items": LOCATION_SCHEMA_V3,
-}
-
