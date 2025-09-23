@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from copy import deepcopy
 
-import requests
+import json, requests
 
 from ..objects import (
     Agent, PickupPoints_2025_04, Parcels, PDFConfig, Receiver, Sender, SenderPartners,
@@ -141,8 +141,10 @@ VALID_ADDITIONAL_SERVICES = {
     'PO5007': ['COD', 'NOT', 'OPAY', 'REMIPOST'],
 }
 
+# Set the default API to only current version as this time:
 POSTI_PICKUP_POINT_DEFAULT_API_VERSION = "2025-04"
 
+# This is likely not change as often as versioned pp url:
 POSTI_PICKUP_POINT_API_AUTH = "https://gateway-auth.posti.fi/api/v1/token"
 
 
@@ -269,6 +271,7 @@ def _infer_parcels_class(service_id):
         return WeightedParcels
     return Parcels
 
+# Get authentication token for PickupPoint:
 def get_token(username, password, posti_api_version=POSTI_PICKUP_POINT_DEFAULT_API_VERSION):
 
     url = POSTI_PICKUP_POINT_API_AUTH
@@ -285,6 +288,8 @@ def get_token(username, password, posti_api_version=POSTI_PICKUP_POINT_DEFAULT_A
         })
 
     if response.status_code == 200:
+        # If success, get token, expiration time and url for that version, if requested
+        # version is included in response.
         access_token = response.json().get("access_token")
         token_lifetime = response.json().get("expires_in")
         api_version_details = response.json().get('posti_fi', {}).get('targets', {}).get(posti_api_version, {})
@@ -295,16 +300,22 @@ def get_token(username, password, posti_api_version=POSTI_PICKUP_POINT_DEFAULT_A
             ppp_api_url = api_version_details.get('url')
 
     else:
-        print("Failed to obtain the OAuth token:", response.status_code)
-        print(response)
-        return None
+        raise Exception("Failed to obtain the OAuth token: {}\n \
+            Error: {}\n \
+            Description: {}".format(
+                response.status_code,
+                response.json().get("error"),
+                response.json().get("error_description")))
 
-    return access_token, token_lifetime, ppp_api_url
+    return access_token, token_lifetime, posti_api_version, ppp_api_url
+
+# Do note that the PupCode is old term, new api uses ID, but PupCode is
+# clearer in meaning. (And is the same thing.)
 
 def get_location_by_pupcode_2025_04(access_token, ppp_api_url, 
-            language, pupCode, country):
+            language, pupcode, country):
 
-    url = "{}/pickuppoints/{}/{}".format(ppp_api_url, country, pupCode)
+    url = "{}/pickuppoints/{}/{}".format(ppp_api_url, country, pupcode)
 
     header = {
         "Accept-Language":language,
@@ -312,66 +323,136 @@ def get_location_by_pupcode_2025_04(access_token, ppp_api_url,
     }
 
     response = requests.get(url, headers=header)
-    print(response.json())
 
-    points = response.json().get("pickupPoints")
-    if points:
-        return PickupPoints_2025_04(points)
+    if response.status_code == 200:
+        points = response.json().get("pickupPoints")
+        if points:
+            return PickupPoints_2025_04(points)
+        else:
+            return None
     else:
-        return None
+        raise Exception("Failed to obtain locations: {}\n \
+            Error: {}\n \
+            Description: {}".format(
+                response.status_code,
+                response.response.json().get("error"),
+                response.response.json().get("error_description")))
+
 
 def get_location_by_pupcode(access_token, posti_api_version, ppp_api_url, 
-            language="fi", pupCode=None, country="FI"):
+            language="fi", pupcode=None, country="FI"):
+    # For the future if new versions require different queries.
     if posti_api_version == "2025-04":
         return get_location_by_pupcode_2025_04(access_token, ppp_api_url, 
-            language, pupCode, country)
+            language, pupcode, country)
 
-def get_locations_by_address_2025_04(access_token, ppp_api_url,
-            language, country, city, postcode, street_address, limit, filters, box_only):
-   
+def get_locations_by_address_2025_04(access_token, ppp_api_url, language,
+            country, city, postcode, street_address,
+            outdoor_locker, wheelchair_accessibility, open_on_weekends,
+            adr_limited_quantities, saturday_delivery,
+            box_only, limit):
+    
+    #           ---- serviceFilters ----
+
+    # outdoorLocker	            Set to false, if outdoor lockers should be excluded from the results.
+    # wheelchairAccessibility	Set to true, if only pickup points that are accessible with a
+    #                               wheelchair should be included in the results.
+    # openOnWeekends	        Set to true, if only pickup points that are open on Saturdays
+    #                               or Sundays should be included in the results.
+    # ADRLimitedQuantities	    Set to true, if only pickup points that accept shipments containing
+    #                               limited quantity substances should be included in the results.
+    # saturdayDelivery	        Set to true, if only pickup points that can receive inbound parcels
+    #                           on Saturdays should be included in the results.
+
+    service_filters = {
+                "outdoorLocker": outdoor_locker,
+                "wheelchairAccessibility": wheelchair_accessibility,
+                "openOnWeekends": open_on_weekends,
+                "ADRLimitedQuantities": adr_limited_quantities,
+                "saturdayDelivery": saturday_delivery
+                }
+
+    filtered_service_filters = {}
+    for sf_name, sf_value in service_filters.items():
+        if sf_value is not None:
+            filtered_service_filters[sf_name] = sf_value
+    filters = filtered_service_filters
+
+    #       ---- URL ----
+
     url = "{}/pickuppoints".format(ppp_api_url)
 
+    #       ---- Header ----
     header = {
         "Accept-Language": language,
         "Authorization": "Bearer {}".format(access_token)
     }
 
+    #       ---- searchCriteria ----
+
+    location = {
+            "countryCode": country,
+            "city": city,
+            "postcode": postcode,
+            "street": street_address
+            }
+    
+    filtered_locations = {}
+    for loc_name, loc_value in location.items():
+        if loc_value is not None:
+            filtered_locations[loc_name] = loc_value
+    locations = filtered_locations
+
     params = {
         "searchCriteria":{
-            "location": {
-                "countryCode": country,
-                "postcode": postcode,
-            },
+            "location": locations,
             "serviceFilters": filters
         },
         "limit": limit
     }
-    if street_address:
-        params["searchCriteria"]["location"]["street"] = street_address
-
-    if city:
-        params["searchCriteria"]["location"]["city"] = city
     
+    # If none, return both manned and box locations:
     if box_only is not None:
         params["searchCriteria"]["parcelLocker"] = box_only
-    
-    response = requests.post(url, headers=header, json=params)
-    print(response)
-    print(response.status_code)
-    print(response.json())
 
-    points = response.json().get("pickupPoints")
-    if points:
-        return PickupPoints_2025_04(points)
+    response = requests.post(url, headers=header, json=params)
+
+    if response.status_code == 200:
+        points = response.json().get("pickupPoints")
+        if points:
+            return PickupPoints_2025_04(points)
+        else:
+            return None
     else:
-        return None 
+        raise Exception("Failed to obtain locations: {}\n \
+            ErrorCode: {}\n \
+            Error: {}\n \
+            Description: {}".format(
+                response.status_code,
+                response.json().get("errorCode"),
+                response.json().get("message"),
+                response.json().get("details")))
 
 def get_locations_by_address(access_token, posti_api_version, ppp_api_url, 
-            language="fi", country="FI", city=None, postcode=None,
-            street_address=None, limit=20, filters=None, box_only=None):
+            language="fi",
+            country="FI",
+            city=None,
+            postcode=None,
+            street_address=None,
+            outdoor_locker=None,
+            wheelchair_accessibility=None,
+            open_on_weekends=None,
+            adr_limited_quantities=None,
+            saturday_delivery=None,
+            box_only=None,
+            limit=20
+            ):
     if posti_api_version == "2025-04":
-        return get_locations_by_address_2025_04(access_token, ppp_api_url,
-            language, country, city, postcode, street_address, limit, filters, box_only)
+        return get_locations_by_address_2025_04(access_token, ppp_api_url, language,
+            country, city, postcode, street_address,
+            outdoor_locker, wheelchair_accessibility, open_on_weekends,
+            adr_limited_quantities, saturday_delivery,
+            box_only, limit)
 
 
 def get_additional_services(service_id):
